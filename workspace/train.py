@@ -27,6 +27,7 @@ def train(args, unmix, device, data_dict, train_sampler, optimizer):
     for n in range(args.num_it):
 
         x, y = data.SATBBatchGenerator(train_sampler,args,data_dict,partition='train')
+        import pdb; pdb.set_trace()
         pbar.set_description("Training batch")
         x, y = x.to(device), y.to(device)
         optimizer.zero_grad()

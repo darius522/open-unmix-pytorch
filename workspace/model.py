@@ -53,6 +53,7 @@ class STFT(nn.Module):
         stft_f = stft_f.contiguous().view(
             nb_samples, nb_channels, self.n_fft // 2 + 1, -1, 2
         )
+        import pdb; pdb.set_trace()
         return stft_f
 
 

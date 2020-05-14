@@ -901,7 +901,7 @@ def SATBBatchGenerator(dataset, args, data_dict, use_case=1, partition='train', 
 
     num_frames = int(args.seq_dur * args.bandwidth)
 
-    out_shape  = np.zeros((batch_size, num_frames))
+    out_shape  = np.zeros((batch_size, 1, num_frames))
     out_shapes = {'mix':np.copy(out_shape), args.target:np.copy(out_shape)}
 
     for i in range(batch_size):
@@ -957,18 +957,19 @@ def SATBBatchGenerator(dataset, args, data_dict, use_case=1, partition='train', 
                 zero_source_counter += 1
                 source_chunk = np.zeros(num_frames)
 
-            out_shapes['mix'][i,:] = np.add(out_shapes['mix'][i,:],source_chunk)# Add the chunk to the mix
+            out_shapes['mix'][i,:,:] = np.add(out_shapes['mix'][i,:,:],source_chunk[np.newaxis,...])# Add the chunk to the mix
 
             if source[:-1] == args.target:
-                out_shapes[args.target][i,:] = source_chunk
+                out_shapes[args.target][i,:,:] = source_chunk[np.newaxis,...]
         
         # Scale down all the group chunks based off number of sources per group
         scaler = len(randsources_for_song) - zero_source_counter
 
-        out_shapes['mix'][i,:] = (out_shapes['mix'][i,:]/scaler)
+        out_shapes['mix'][i,:,:] = (out_shapes['mix'][i,:,:]/scaler)
+        out_shapes[args.target][i,:,:] = (out_shapes[args.target][i,:,:]/scaler)
 
-    x = torch.tensor(out_shapes['mix'][np.newaxis,...].astype(np.float32))
-    y = torch.tensor(out_shapes[args.target][np.newaxis,...].astype(np.float32))
+    x = torch.tensor(out_shapes['mix'].astype(np.float32))
+    y = torch.tensor(out_shapes[args.target].astype(np.float32))
     return x,y
 
 
