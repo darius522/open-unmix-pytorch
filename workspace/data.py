@@ -6,14 +6,6 @@ import random
 import musdb
 import torch
 import tqdm
-import glob
-import h5py
-from itertools import chain
-from matplotlib import pyplot as plt
-from scipy.signal import resample
-import numpy as np
-import os
-import librosa
 
 
 class Compose(object):
@@ -238,8 +230,6 @@ def load_datasets(parser, args):
             split='valid', samples_per_track=1, seq_duration=None,
             **dataset_kwargs
         )
-
-    #elif args.dataset == 'satb':
 
     return train_dataset, valid_dataset, args
 
@@ -825,147 +815,6 @@ class MUSDBDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.mus.tracks) * self.samples_per_track
-
-
-
-def createSATBDataset(args):
-
-    tracks = dict()
-    resampling_fs = args.bandwidth
-
-    # Get all the stem files
-    dsd_train = glob.glob(args.train_path+"/**/*.wav",recursive=True)                                                              # Get entirety of training set
-    songs = set([os.path.splitext(os.path.basename(i))[0].split('_')[1] for i in dsd_train])                                # Extract only songs from name
-    train_idx = [i for i in range(len(dsd_train))]                                                      # Get all files from training set that are not part of valid set
-
-    tracks['train'] = np.take(dsd_train, train_idx)
-    tracks['valid']  = glob.glob(args.valid_path+"/**/*.wav",recursive=True)
-
-    h5file = h5py.File(os.path.join(args.root,"satb.hdf5"), "w")
-
-    # Write stems to hdf5 file for train/valid/test partitions
-    for curr_partition in ["train", "valid"]:
-
-        print("Writing " + curr_partition + " partition with "+str(len(tracks[curr_partition]))+" files...")
-
-        # Shuffle sample order
-        stem_list = tracks[curr_partition]
-        random.shuffle(stem_list)
-
-        # Create group for set
-        if not str(curr_partition) in h5file:
-            set_grp  = h5file.create_group(curr_partition)
-
-        count = 0
-        print('Ready to create HDF5') 
-        for track in stem_list:
-
-            count += 1
-
-            filename = os.path.splitext(os.path.basename(track))[0].split('_')
-            print('processing '+str(count)+' of '+str(len(stem_list))+' files')
-
-            song = filename[1]
-            part = ''.join(filename[2:4])
-
-            # Create group for the PART if needed
-            if not str(curr_partition+'/'+part) in h5file:
-                part_grp  = set_grp.create_group(part)
-
-            # Create group for the SONG if needed
-            if not str(curr_partition+'/'+part+'/'+song) in h5file:
-                part_grp = h5file[str(curr_partition+'/'+part)]
-                subgrp  = part_grp.create_group(song)
-
-            # Once part groups / song subgroups are created, store file
-            audio, s = librosa.load(track, sr=resampling_fs)
-            subgrp = h5file[str(curr_partition+'/'+part+'/'+song)]
-            subgrp.create_dataset("raw_wav",data=audio)
-
-    print('Done Creating HDF5') 
-    h5file.close()
-
-def SATBBatchGenerator(dataset, args, use_case=1, partition='train', resampling_fs=22050, debug=False):
-
-
-    randsong = random.choice(list(partCountPerSongDict.keys()))
-
-    # Get all available part from chosen song
-    part_count = partCountPerSongDict[randsong]
-
-    startspl = 0
-    endspl   = 0
-
-    num_frame = args.seq_dur * args.bandwidth
-
-    out_shape  = np.zeros((args.batch_size, num_frames,1))
-    out_shapes = {'soprano':np.copy(out_shape),'alto':np.copy(out_shape),'tenor':np.copy(out_shape),'bass':np.copy(out_shape), 'mix':np.copy(out_shape)}
-
-    for i in range(args.batch_size):
-
-        # Use-Case: At most one singer per part
-        if (use_case==0):
-            max_num_singer_per_part = 1
-            randsources = random.sample(sources, random.randint(1,len(sources)))                   # Randomize source pick if at most one singer per part
-        # Use-Case: Exactly one singer per part
-        elif (use_case==1):
-            max_num_singer_per_part = 1
-            randsources = sources                                                                  # Take all sources + Set num singer = 1
-        # Use-Case: At least one singer per part
-        else:
-            max_num_singer_per_part = 4
-            randsources = sources                                                                  # Take all sources + Set max num of singer = 4 
-
-
-        # Get Start and End samples. Pick random part to calculate start/end spl
-        while startspl == 0:
-            try:
-                randpart = random.choice(sources) + '1'
-                startspl = random.randint(0,len(dataset[partition][randpart][randsong]['raw_wav'])-num_frames) # This assume that all stems are the same length
-            except:
-                continue
-
-
-        endspl   = startspl+num_frames
-
-        # Get Random Sources: 
-        randsources_for_song = [] 
-        for source in randsources:
-            # If no singer in part, default it to one and fill array with zeros later
-            if part_count[source] > 0:
-                max_for_part = part_count[source] if part_count[source] < max_num_singer_per_part else max_num_singer_per_part
-            else:
-                max_for_part = 1 
-
-            num_singer_per_part = random.randint(1,max_for_part)                      # Get random number of singer per part based on max_for_part
-            singer_num = random.sample(range(1,max_for_part+1),num_singer_per_part)   # Get random part number for the number of singer based off max_for_part
-            randsources_for_part = np.repeat(source,num_singer_per_part)              # Repeat the parts according to the number of singer per group
-            randsources_for_part = ["{}{}".format(a_, b_) for a_, b_ in zip(randsources_for_part, singer_num)] # Concatenate strings for part name
-            randsources_for_song+=randsources_for_part
-
-        # Retrieve the chunks and store them in output shapes 
-        zero_source_counter = 0                                        
-        for source in randsources_for_song:
-
-            # Try to retrieve chunk. If part doesn't exist, create array of zeros instead
-            try:
-                source_chunk = dataset[partition][source][randsong]['raw_wav'][startspl:endspl]              # Retrieve part's chunk
-            except:
-                zero_source_counter += 1
-                source_chunk = np.zeros(num_frames)
-
-            out_shapes[source[:-1]][i] = np.add(out_shapes[source[:-1]][i],source_chunk[..., np.newaxis])# Store chunk in output shapes
-            out_shapes['mix'][i] = np.add(out_shapes['mix'][i],source_chunk[..., np.newaxis])            # Add the chunk to the mix
-        
-        # Scale down all the group chunks based off number of sources per group
-        scaler = len(randsources_for_song) - zero_source_counter
-        out_shapes['soprano'][i] = (out_shapes['soprano'][i]/scaler)
-        out_shapes['alto'][i]    = (out_shapes['alto'][i]/scaler)
-        out_shapes['tenor'][i]   = (out_shapes['tenor'][i]/scaler)
-        out_shapes['bass'][i]    = (out_shapes['bass'][i]/scaler)
-        out_shapes['mix'][i] = (out_shapes['mix'][i]/scaler)
-
-    return out_shapes
 
 
 if __name__ == "__main__":
