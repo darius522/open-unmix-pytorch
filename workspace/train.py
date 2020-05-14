@@ -67,6 +67,7 @@ def get_statistics(args, dataset):
     for ind in pbar:
         x, y = dataset_scaler[ind]
         pbar.set_description("Compute dataset statistics")
+        import pdb; pdb.set_trace()
         X = spec(x[None, ...])
         scaler.partial_fit(np.squeeze(X))
 
@@ -145,9 +146,9 @@ def main():
     print("Using Torchaudio: ", utils._torchaudio_available())
     dataloader_kwargs = {'num_workers': args.nb_workers, 'pin_memory': True} if use_cuda else {}
 
-    repo_dir = os.path.abspath(os.path.dirname(__file__))
-    repo = Repo(repo_dir)
-    commit = repo.head.commit.hexsha[:7]
+    # repo_dir = os.path.abspath(os.path.dirname(__file__))
+    # repo = Repo(repo_dir)
+    # commit = repo.head.commit.hexsha[:7]
 
     # use jpg or npy
     torch.manual_seed(args.seed)
