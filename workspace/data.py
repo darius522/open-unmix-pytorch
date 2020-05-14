@@ -885,23 +885,26 @@ def createSATBDataset(args):
     print('Done Creating HDF5') 
     h5file.close()
 
-def SATBBatchGenerator(dataset, args, use_case=1, partition='train', resampling_fs=22050, debug=False):
+def SATBBatchGenerator(dataset, args, data_dict, use_case=1, partition='train', resampling_fs=22050, debug=False):
 
 
-    randsong = random.choice(list(partCountPerSongDict.keys()))
+    randsong = random.choice(list(data_dict.keys()))
+    sources = ['soprano','tenor','bass','alto']
+
+    batch_size = args.batch_size if partition == 'train' else 1
 
     # Get all available part from chosen song
-    part_count = partCountPerSongDict[randsong]
+    part_count = data_dict[randsong]
 
     startspl = 0
     endspl   = 0
 
-    num_frame = args.seq_dur * args.bandwidth
+    num_frames = int(args.seq_dur * args.bandwidth)
 
-    out_shape  = np.zeros((args.batch_size, num_frames,1))
-    out_shapes = {'soprano':np.copy(out_shape),'alto':np.copy(out_shape),'tenor':np.copy(out_shape),'bass':np.copy(out_shape), 'mix':np.copy(out_shape)}
+    out_shape  = np.zeros((batch_size, num_frames))
+    out_shapes = {'mix':np.copy(out_shape), args.target:np.copy(out_shape)}
 
-    for i in range(args.batch_size):
+    for i in range(batch_size):
 
         # Use-Case: At most one singer per part
         if (use_case==0):
@@ -954,18 +957,19 @@ def SATBBatchGenerator(dataset, args, use_case=1, partition='train', resampling_
                 zero_source_counter += 1
                 source_chunk = np.zeros(num_frames)
 
-            out_shapes[source[:-1]][i] = np.add(out_shapes[source[:-1]][i],source_chunk[..., np.newaxis])# Store chunk in output shapes
-            out_shapes['mix'][i] = np.add(out_shapes['mix'][i],source_chunk[..., np.newaxis])            # Add the chunk to the mix
+            out_shapes['mix'][i,:] = np.add(out_shapes['mix'][i,:],source_chunk)# Add the chunk to the mix
+
+            if source[:-1] == args.target:
+                out_shapes[args.target][i,:] = source_chunk
         
         # Scale down all the group chunks based off number of sources per group
         scaler = len(randsources_for_song) - zero_source_counter
-        out_shapes['soprano'][i] = (out_shapes['soprano'][i]/scaler)
-        out_shapes['alto'][i]    = (out_shapes['alto'][i]/scaler)
-        out_shapes['tenor'][i]   = (out_shapes['tenor'][i]/scaler)
-        out_shapes['bass'][i]    = (out_shapes['bass'][i]/scaler)
-        out_shapes['mix'][i] = (out_shapes['mix'][i]/scaler)
 
-    return out_shapes
+        out_shapes['mix'][i,:] = (out_shapes['mix'][i,:]/scaler)
+
+    x = torch.tensor(out_shapes['mix'][np.newaxis,...].astype(np.float32))
+    y = torch.tensor(out_shapes[args.target][np.newaxis,...].astype(np.float32))
+    return x,y
 
 
 if __name__ == "__main__":
