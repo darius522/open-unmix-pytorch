@@ -8,6 +8,7 @@ OSU/
 *.wav
 *.mp3
 *.pth.tar
+*.hdf5
 env*/
 
 #####=== Python ===#####

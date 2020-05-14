@@ -170,6 +170,8 @@ def main():
         **dataloader_kwargs
     )
 
+    import pdb; pdb.set_trace()
+    
     if args.model:
         scaler_mean = None
         scaler_std = None
