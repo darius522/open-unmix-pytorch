@@ -14,6 +14,7 @@ from scipy.signal import resample
 import numpy as np
 import os
 import librosa
+import soundfile
 
 
 class Compose(object):
@@ -919,14 +920,15 @@ def SATBBatchGenerator(dataset, args, data_dict, use_case=1, partition='train', 
             max_num_singer_per_part = 4
             randsources = sources                                                                  # Take all sources + Set max num of singer = 4 
 
-
+        startspl = 0
+        endspl   = 0
         # Get Start and End samples. Pick random part to calculate start/end spl
         while startspl == 0:
             try:
                 randpart = random.choice(sources) + '1'
                 startspl = random.randint(0,len(dataset[partition][randpart][randsong]['raw_wav'])-num_frames) # This assume that all stems are the same length
-            except:
-                continue
+            except Exception as e: 
+                print(e)
 
 
         endspl   = startspl+num_frames
@@ -970,6 +972,14 @@ def SATBBatchGenerator(dataset, args, data_dict, use_case=1, partition='train', 
 
     x = torch.tensor(out_shapes['mix'].astype(np.float32))
     y = torch.tensor(out_shapes[args.target].astype(np.float32))
+
+    if debug == True and partition == 'train':
+        debug_dir = './debug/'+str(partition)
+        if not os.path.isdir(debug_dir):
+            os.mkdir(debug_dir)
+        for batch in range(batch_size):
+            soundfile.write(debug_dir+'/'+str(batch)+'_'+str(args.target)+'.wav', np.reshape(out_shapes[args.target][batch,:,:],(-1,1)), resampling_fs, 'PCM_24')
+            soundfile.write(debug_dir+'/'+str(batch)+'_mix'+'.wav', np.reshape(out_shapes['mix'][batch,:,:],(-1,1)), resampling_fs, 'PCM_24')
     return x,y
 
 

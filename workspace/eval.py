@@ -41,14 +41,14 @@ def separate_and_evaluate(
 if __name__ == '__main__':
     # Training settings
     parser = argparse.ArgumentParser(
-        description='MUSDB18 Evaluation',
+        description='Soprano Test',
         add_help=False
     )
 
     parser.add_argument(
         '--targets',
         nargs='+',
-        default=['vocals', 'drums', 'bass', 'other'],
+        default=['soprano'],
         type=str,
         help='provide targets to be processed. \
               If none, all available targets will be computed'
@@ -56,26 +56,30 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--model',
-        default='umxhq',
+        default='open-unmix',
         type=str,
         help='path to mode base directory of pretrained models'
     )
 
     parser.add_argument(
         '--outdir',
+        default='open-unmix',
         type=str,
+        default='pred_audio_usecase1',
         help='Results path where audio evaluation results are stored'
     )
 
     parser.add_argument(
         '--evaldir',
         type=str,
+        default='pred_audio_usecase1',
         help='Results path for museval estimates'
     )
 
     parser.add_argument(
         '--root',
         type=str,
+        default='../../data/satb_dst/test_usecase1/raw_audio',
         help='Path to MUSDB18'
     )
 
@@ -111,12 +115,12 @@ if __name__ == '__main__':
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    mus = musdb.DB(
-        root=args.root,
-        download=args.root is None,
-        subsets=args.subset,
-        is_wav=args.is_wav
-    )
+    # mus = musdb.DB(
+    #     root=args.root,
+    #     download=args.root is None,
+    #     subsets=args.subset,
+    #     is_wav=args.is_wav
+    # )
     if args.cores > 1:
         pool = multiprocessing.Pool(args.cores)
         results = museval.EvalStore()

@@ -22,12 +22,12 @@ tqdm.monitor_interval = 0
 def train(args, unmix, device, data_dict, train_sampler, optimizer):
     losses = utils.AverageMeter()
     unmix.train()
-    pbar = tqdm.tqdm(train_sampler, disable=args.quiet)
+    pbar = tqdm.tqdm(range(args.num_it), disable=args.quiet)
 
-    for n in range(args.num_it):
+    for n in pbar:
 
         x, y = data.SATBBatchGenerator(train_sampler,args,data_dict,partition='train')
-        import pdb; pdb.set_trace()
+
         pbar.set_description("Training batch")
         x, y = x.to(device), y.to(device)
         optimizer.zero_grad()
@@ -42,9 +42,9 @@ def train(args, unmix, device, data_dict, train_sampler, optimizer):
 def valid(args, unmix, device, data_dict, valid_sampler):
     losses = utils.AverageMeter()
     unmix.eval()
-    pbar = tqdm.tqdm(valid_sampler, disable=args.quiet)
+    pbar = tqdm.tqdm(range(args.num_it), disable=args.quiet)
 
-    for n in range(args['num-it']):
+    for n in pbar:
 
         x, y = data.SATBBatchGenerator(valid_sampler,args,data_dict,partition='valid')
         pbar.set_description("Valid batch")
@@ -171,7 +171,7 @@ def main():
                         help='hidden size parameter of dense bottleneck layers')
     parser.add_argument('--bandwidth', type=int, default=22050,
                         help='maximum model bandwidth in herz')
-    parser.add_argument('--nb-channels', type=int, default=2,
+    parser.add_argument('--nb-channels', type=int, default=1,
                         help='set number of channels for model (1, 2)')
     parser.add_argument('--nb-workers', type=int, default=0,
                         help='Number of workers for dataloader.')
@@ -293,7 +293,7 @@ def main():
         t.set_description("Training Epoch")
         end = time.time()
         train_loss = train(args, unmix, device, dst_dict_train, dataset, optimizer)
-        valid_loss = valid(args, unmix, device, dst_dict_valid, valid_sampler)
+        valid_loss = valid(args, unmix, device, dst_dict_valid, dataset)
         scheduler.step(valid_loss)
         train_losses.append(train_loss)
         valid_losses.append(valid_loss)
